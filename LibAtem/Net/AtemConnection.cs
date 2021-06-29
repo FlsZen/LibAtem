@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 using log4net;
 using LibAtem.Commands;
 using LibAtem.Commands.DeviceProfile;
@@ -26,7 +28,7 @@ namespace LibAtem.Net
         public EndPoint Endpoint { get; }
 
         private readonly object _lastSentAckLock = new object();
-        private DateTime _lastReceivedTime;
+        private Task _timeoutTask;
 
         private uint _lastPacketId;
         private uint? _lastReceivedAck;
@@ -46,10 +48,12 @@ namespace LibAtem.Net
         public delegate void InitCompleteHandler(object sender);
         public delegate void DisconnectHandler(object sender);
         public delegate void PacketHandler(object sender, ReceivedPacket pkt);
+        public delegate void TimedOutHandler(object sender);
 
         public event InitCompleteHandler OnInitComplete;
         public event DisconnectHandler OnDisconnect;
         public event PacketHandler OnReceivePacket;
+        public event TimedOutHandler OnTimedOut;
 
         private class InFlightMessage
         {
@@ -75,7 +79,7 @@ namespace LibAtem.Net
         {
             Endpoint = endpoint;
             SessionId = sessionId;
-            _lastReceivedTime = DateTime.Now;
+            UpdateConnectionTimeout(true);
 
             _messageQueue = new Queue<OutboundMessage>();
             _inFlight = new List<InFlightMessage>();
@@ -92,7 +96,7 @@ namespace LibAtem.Net
             {
                 lock (_messageQueue)
                 {
-                    _lastReceivedTime = DateTime.Now;
+                    UpdateConnectionTimeout(true);
                     _lastPacketId = 0;
                     _lastReceivedAck = null;
                     _lastSentAck = null;
@@ -104,7 +108,7 @@ namespace LibAtem.Net
             }
         }
 
-        public bool HasTimedOut => GetTimeBetween(_lastReceivedTime, DateTime.Now) > TimeOutMilliseonds;
+        public bool HasTimedOut => _timeoutTask?.IsCompleted == true;
 
         private uint IncrementPacketId(uint pktId, uint delta = 1)
         {
@@ -146,7 +150,7 @@ namespace LibAtem.Net
                 if (HasTimedOut)
                     return;
 
-                _lastReceivedTime = DateTime.Now;
+                UpdateConnectionTimeout(true);
 
                 // If we have already acked, then reack 
                 if (packet.CommandCode.HasFlag(ReceivedPacket.CommandCodeFlags.AckRequest) && IsPacketCoveredByAck(_readyToAck.GetValueOrDefault(0), packet.PacketId))
@@ -301,6 +305,23 @@ namespace LibAtem.Net
             return diff.Seconds * 1000 + diff.Milliseconds;
         }
 
+        private void UpdateConnectionTimeout(Boolean alive)
+        {
+            var newTimeoutTask = Task.Delay(TimeOutMilliseonds);
+            
+            newTimeoutTask.ContinueWith(_ =>
+            {
+                // If this is the live task, swap it with null and continue with the timeout.
+                if (Interlocked.CompareExchange(ref _timeoutTask, null, newTimeoutTask) != newTimeoutTask)
+                    return;
+
+                // Has timed out.
+                OnTimedOut?.Invoke(this);
+            });
+            
+            _timeoutTask = alive ? newTimeoutTask : null;
+        }
+
         private static bool IsPacketCoveredByAck(uint ackId, uint packetId)
         {
             const int tol = 1 << 8;
@@ -383,8 +404,9 @@ namespace LibAtem.Net
             catch (ObjectDisposedException)
             {
                 Log.ErrorFormat("{0} - Discarding message due to socket being disposed", Endpoint);
+                
                 // Mark as timed out. This will cause it to be cleaned up shortly
-                _lastReceivedTime = DateTime.MinValue;
+                _timeoutTask = null;
 
                 OnDisconnect?.Invoke(this);
             }

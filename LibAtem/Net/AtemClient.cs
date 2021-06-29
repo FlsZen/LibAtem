@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using log4net;
 using LibAtem.Commands;
 using LibAtem.Net.DataTransfer;
@@ -20,7 +19,6 @@ namespace LibAtem.Net
         private readonly IPEndPoint _remoteEp;
 
         private readonly AtemClientConnection _connection;
-        private ThreadTimer _timeoutTimer;
         private ThreadTimer _ackTimer;
         private Thread _sendThread;
         private Thread _handleThread;
@@ -53,6 +51,7 @@ namespace LibAtem.Net
             _connection = new AtemClientConnection(_remoteEp, new Random().Next(32767));
             _connection.OnDisconnect += sender => OnDisconnect?.Invoke(this);
             _connection.OnInitComplete += sender => OnConnection?.Invoke(this);
+            _connection.OnTimedOut += _ => Reconnect();
 
             DataTransfer = new DataTransferManager(_connection);
 
@@ -71,7 +70,6 @@ namespace LibAtem.Net
             SendHandshake();
             StartSendingTimer();
             StartHandleThread();
-            StartTimeoutTimer();
             StartAckTimer();
             return true;
         }
@@ -101,17 +99,6 @@ namespace LibAtem.Net
             }
 
             return true;
-        }
-
-        private void StartTimeoutTimer()
-        {
-            _timeoutTimer = new ThreadTimer(() =>
-            {
-                if (!_connection.HasTimedOut)
-                    return;
-
-                Reconnect();
-            }, AtemConstants.TimeoutInterval);
         }
 
         private void StartAckTimer()
@@ -235,8 +222,6 @@ namespace LibAtem.Net
             // TODO
 
             DataTransfer?.Dispose();
-
-            _timeoutTimer?.Dispose();
         }
 
         public bool HasQueuedOutbound()
