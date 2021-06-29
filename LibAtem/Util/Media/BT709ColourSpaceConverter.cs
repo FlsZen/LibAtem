@@ -57,7 +57,7 @@ namespace LibAtem.Util.Media
                 res[i] = (byte) (a1a >> 4);
                 res[i + 1] = (byte) (((a1a & 0x0f) << 4) | (cb >> 6));
                 res[i + 2] = (byte) (((cb & 0x3f) << 2) | (y1 >> 8));
-                res[i + 3] = res[i] = (byte) (y1 & 0xff);
+                res[i + 3] = (byte) (y1 & 0xff);
                 res[i + 4] = (byte) (a2a >> 4);
                 res[i + 5] = (byte) (((a2a & 0x0f) << 4) | (cr >> 6));
                 res[i + 6] = (byte) (((cr & 0x3f) << 2) | (y2 >> 8));
@@ -111,6 +111,37 @@ namespace LibAtem.Util.Media
                 res[i + 4] = r2;
                 res[i + 5] = g2;
                 res[i + 6] = b2;
+                res[i + 7] = a2a;
+            }
+
+            return res;
+        }
+        
+        
+        public static byte[] ToBGRA8(byte[] data)
+        {
+            var res = new byte[data.Length];
+            for (int i = 0; i <= data.Length - 8; i += 8)
+            {
+                int a1 = (data[i] << 4) + ((data[i + 1] & 0xf0) >> 4);
+                int a2 = (data[i + 4] << 4) + ((data[i + 5] & 0xf0) >> 4);
+                int cb = ((data[i + 1] & 0x0f) << 6) + ((data[i + 2] & 0xfc) >> 2);
+                int y1 = ((data[i + 2] & 0x03) << 8) + (data[i + 3]);
+                int cr = ((data[i + 5] & 0x0f) << 6) + ((data[i + 6] & 0xfc) >> 2);
+                int y2 = ((data[i + 6] & 0x03) << 8) + (data[i + 7]);
+
+                byte a1a = ToA8(a1);
+                byte a2a = ToA8(a2);
+                (byte r1, byte g1, byte b1) = ToRGB8(y1, cb, cr);
+                (byte r2, byte g2, byte b2) = ToRGB8(y2, cb, cr);
+
+                res[i] = b1;
+                res[i + 1] = g1;
+                res[i + 2] = r1;
+                res[i + 3] = a1a;
+                res[i + 4] = b2;
+                res[i + 5] = g2;
+                res[i + 6] = r2;
                 res[i + 7] = a2a;
             }
 
