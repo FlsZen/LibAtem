@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using log4net;
 using LibAtem.Commands;
 using LibAtem.Net.DataTransfer;
+using LibAtem.Util;
 
 namespace LibAtem.Net
 {
@@ -19,8 +20,8 @@ namespace LibAtem.Net
         private readonly IPEndPoint _remoteEp;
 
         private readonly AtemClientConnection _connection;
-        private Timer _timeoutTimer;
-        private Timer _ackTimer;
+        private ThreadTimer _timeoutTimer;
+        private ThreadTimer _ackTimer;
         private Thread _sendThread;
         private Thread _handleThread;
         private bool _run;
@@ -104,24 +105,24 @@ namespace LibAtem.Net
 
         private void StartTimeoutTimer()
         {
-            _timeoutTimer = new Timer(o =>
+            _timeoutTimer = new ThreadTimer(() =>
             {
                 if (!_connection.HasTimedOut)
                     return;
 
                 Reconnect();
-            }, null, 0, AtemConstants.TimeoutInterval);
+            }, AtemConstants.TimeoutInterval);
         }
 
         private void StartAckTimer()
         {
-            _ackTimer = new Timer(o =>
+            _ackTimer = new ThreadTimer(() =>
             {
                 if (!_connection.HasTimedOut)
                     return;
 
                 _connection.SendAckNow(_client.Client);
-            }, null, 0, AtemConstants.AckInterval);
+            }, AtemConstants.AckInterval);
         }
 
         private void StartSendingTimer()

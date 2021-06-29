@@ -6,6 +6,7 @@ using System.Threading;
 using LibAtem.Commands;
 using LibAtem.Commands.DataTransfer;
 using LibAtem.Commands.Media;
+using LibAtem.Util;
 
 namespace LibAtem.Net.DataTransfer
 {
@@ -25,7 +26,7 @@ namespace LibAtem.Net.DataTransfer
         private readonly AtemConnection _connection;
         private readonly ConcurrentQueue<DataTransferJob> _queue;
 
-        private Timer _startTimer;
+        private ThreadTimer _startTimer;
 
         private uint _nextTransferId;
 
@@ -76,13 +77,13 @@ namespace LibAtem.Net.DataTransfer
 
         private void StartTimer()
         {
-            _startTimer = new Timer(o =>
+            _startTimer = new ThreadTimer(() =>
             {
                 if (_connection.HasTimedOut)
                     return;
 
                 DequeueAndRun();
-            }, null, 0, AtemConstants.DataTransferCheckInterval);
+            }, AtemConstants.DataTransferCheckInterval);
         }
 
         public bool IsActive => _currentJob != null;
