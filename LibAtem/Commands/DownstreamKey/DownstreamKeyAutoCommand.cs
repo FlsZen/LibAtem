@@ -10,7 +10,7 @@ namespace LibAtem.Commands.DownstreamKey
     public class DownstreamKeyAutoCommand : SerializableCommandBase
     {
         [CommandId]
-        [Serialize(0), Enum8]
+        [Serialize(1), Enum8]
         public DownstreamKeyId Index { get; set; }
 
         public override IEnumerable<MacroOpBase> ToMacroOps(ProtocolVersion version)
