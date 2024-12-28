@@ -20,6 +20,14 @@ namespace LibAtem.Common
         Mini = 13,
         MiniPro = 14,
         MiniProISO = 15,
+        MiniExtreme = 16,
+        MiniExtremeIso = 17,
+        ConstellationHD1ME = 18,
+        ConstellationHD2ME = 19,
+        ConstellationHD4ME = 20,
+        SDI = 21, // Needs verification
+        SDIProISO = 22, // Needs verification
+        SDIExtremeISO = 23, // Needs verification
     }
 
     public enum MixEffectBlockId

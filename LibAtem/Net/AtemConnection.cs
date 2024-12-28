@@ -12,6 +12,7 @@ using LibAtem.Commands.DeviceProfile;
 using LibAtem.MacroOperations;
 using LibAtem.Serialization;
 using LibAtem.Util;
+using System.Diagnostics;
 
 namespace LibAtem.Net
 {
@@ -221,6 +222,11 @@ namespace LibAtem.Net
                         OnInitComplete?.Invoke(this);
                     }
                     result.AddIfNotNull(cmd);
+
+                    if (cmd == null)
+                    {
+                        Debug.WriteLine($"Received unknown command {rawCmd.Name} with content {payloadStr}");
+                    }
                 }
 
                 return result;
