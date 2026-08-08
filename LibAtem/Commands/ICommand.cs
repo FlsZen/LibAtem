@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using log4net;
 using LibAtem.Serialization;
 
 namespace LibAtem.Commands
@@ -69,47 +68,34 @@ namespace LibAtem.Commands
 
     public static class CommandManager
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(CommandManager));
-
         private static IReadOnlyDictionary<string, List<Tuple<ProtocolVersion, Type>>> commandTypes;
         private static IReadOnlyDictionary<Type, Tuple<string, ProtocolVersion>> commandNames;
 
         private static void GenerateDictionaries()
         {
-            try
+            var resultTypes = new Dictionary<string, List<Tuple<ProtocolVersion, Type>>>();
+            var resultNames = new Dictionary<Type, Tuple<string, ProtocolVersion>>();
+            var assembly = typeof(CommandNameAttribute).GetTypeInfo().Assembly;
+            foreach (Type type in assembly.GetTypes())
             {
-                var resultTypes = new Dictionary<string, List<Tuple<ProtocolVersion, Type>>>();
-                var resultNames = new Dictionary<Type, Tuple<string, ProtocolVersion>>();
-                var assembly = typeof(CommandNameAttribute).GetTypeInfo().Assembly;
-                foreach (Type type in assembly.GetTypes())
-                {
-                    CommandNameAttribute attribute = type.GetTypeInfo().GetCustomAttributes(typeof(CommandNameAttribute), true).OfType<CommandNameAttribute>().FirstOrDefault();
-                    if (attribute == null)
-                        continue;
+                CommandNameAttribute attribute = type.GetTypeInfo().GetCustomAttributes(typeof(CommandNameAttribute), true).OfType<CommandNameAttribute>().FirstOrDefault();
+                if (attribute == null)
+                    continue;
 
-                    if (!typeof(ICommand).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo()))
-                        continue;
+                if (!typeof(ICommand).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo()))
+                    continue;
 
-                    if (!resultTypes.TryGetValue(attribute.Name, out var resultTypesForName))
-                        resultTypesForName = new List<Tuple<ProtocolVersion, Type>>();
+                if (!resultTypes.TryGetValue(attribute.Name, out var resultTypesForName))
+                    resultTypesForName = new List<Tuple<ProtocolVersion, Type>>();
 
-                    if (resultTypesForName.Count(t => t.Item1 == attribute.MinimumVersion) > 0)
-                        Log.FatalFormat("Duplicate definition for {0} for version {1}", attribute.Name, attribute.MinimumVersion);
+                resultTypesForName.Add(Tuple.Create(attribute.MinimumVersion, type));
 
-                    resultTypesForName.Add(Tuple.Create(attribute.MinimumVersion, type));
-
-                    resultTypes[attribute.Name] = resultTypesForName;
-                    resultNames[type] = Tuple.Create(attribute.Name, attribute.MinimumVersion);
-                }
-
-                commandTypes = resultTypes;
-                commandNames = resultNames;
+                resultTypes[attribute.Name] = resultTypesForName;
+                resultNames[type] = Tuple.Create(attribute.Name, attribute.MinimumVersion);
             }
-            catch (Exception e)
-            {
-                Log.FatalFormat("Failed to find all valid command types: {0}", e.Message);
-                throw;
-            }
+
+            commandTypes = resultTypes;
+            commandNames = resultNames;
         }
 
         public static IReadOnlyDictionary<string, List<Tuple<ProtocolVersion, Type>>> GetAllTypes()

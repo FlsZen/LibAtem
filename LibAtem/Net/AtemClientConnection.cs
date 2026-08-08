@@ -2,15 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using log4net;
 using LibAtem.Commands;
 
 namespace LibAtem.Net
 {
     public class AtemClientConnection : AtemConnection
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(AtemConnection));
-
         private readonly List<ICommand> _queuedCommands;
 
         public AtemClientConnection(EndPoint endpoint, int sessionId) : base(endpoint, sessionId)

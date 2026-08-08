@@ -6,7 +6,6 @@ using LibAtem.Commands;
 using System.Collections.Generic;
 using System.Linq;
 using LibAtem.Util;
-using log4net;
 
 namespace LibAtem.MacroOperations
 {
@@ -79,8 +78,6 @@ namespace LibAtem.MacroOperations
 
     public static class MacroOpManager
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(MacroOpManager));
-
         private static IReadOnlyDictionary<MacroOperationType, Tuple<ProtocolVersion, Type>> macroOpTypes;
 
         private static IReadOnlyDictionary<MacroOperationType, Tuple<ProtocolVersion, Type>> FindAllTypes()
@@ -140,22 +137,16 @@ namespace LibAtem.MacroOperations
                 {
                     AutoSerializeBase.CommandPropertySpec info = AutoSerializeBase.GetPropertySpecForType(cmd.GetType());
 
-                    int attrLength = info.Length;
-                    if (attrLength != -1 && attrLength != parsed.BodyLength)
-                        Log.WarnFormat("{0}: Auto deserialize length mismatch", cmd.GetType().Name);
-
                     foreach (AutoSerializeBase.PropertySpec prop in info.Properties)
                     {
                         try
                         {
                             prop.Setter?.DynamicInvoke(cmd, prop.SerAttr.Deserialize(parsed.ReverseBytes, parsed.Body, prop.Attr.StartByte, prop.PropInfo));
                         }
-                        catch (Exception e)
+                        catch (Exception)
                         {
-                            Log.WarnFormat("{0}: Failed to deserialize property {1}: {2}", cmd.GetType().Name, prop.PropInfo.Name, e.ToString());
                         }
                     }
-
                 }
 
                 return cmd;

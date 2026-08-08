@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using log4net;
 using LibAtem.Commands;
 using LibAtem.Net.DataTransfer;
 using LibAtem.Util;
@@ -13,8 +12,6 @@ namespace LibAtem.Net
 {
     public class AtemClient : IDisposable
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(AtemClient));
-
         private readonly UdpClient _client;
         private readonly IPEndPoint _remoteEp;
 
@@ -86,16 +83,14 @@ namespace LibAtem.Net
                     if (_connection.ConnectionVersion != null)
                         OnDisconnect?.Invoke(this);
 
-                    Log.InfoFormat("Attempting Reconnect");
                     _connection.ResetConnStatsInfo();
                     _connection.SessionId = new Random().Next(32767);
                     SendHandshake();
                     StartSendingTimer();
                 }
             }
-            catch (SocketException e)
+            catch (SocketException)
             {
-                Log.DebugFormat("Failed to reconnect: {0}", e);
             }
 
             return true;
@@ -137,7 +132,6 @@ namespace LibAtem.Net
                     int rawCount = cmds.Count;
 
                     cmds = cmds.Where(c => !DataTransfer.HandleCommand(c)).ToList();
-                    Log.DebugFormat("Recieved {0} commands. {1} to be handle by user code", rawCount, cmds.Count);
 
                     if (cmds.Any())
                         OnReceive?.Invoke(this, cmds);
@@ -162,7 +156,6 @@ namespace LibAtem.Net
                 0x01, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00
             };
 
-            Log.DebugFormat("Starting handshake");
             _client.SendAsync(handshake, handshake.Length, _remoteEp);
         }
 
@@ -181,7 +174,6 @@ namespace LibAtem.Net
 
                         if (packet.CommandCode.HasFlag(ReceivedPacket.CommandCodeFlags.Handshake))
                         {
-                            Log.DebugFormat("Completed handshake");
                             DataTransfer.Reset();
                             _connection.SendAckNow(_client.Client, true);
                             continue;
@@ -191,14 +183,12 @@ namespace LibAtem.Net
                         if (_connection.SessionId != packet.SessionId)
                         {
                             _connection.SessionId = (int)packet.SessionId;
-                            Log.InfoFormat("Got new session id: {0}", packet.SessionId);
                         }
 
                         _connection.Receive(_client.Client, packet);
                     }
                     catch (SocketException)
                     {
-                        Log.ErrorFormat("Socket Exception");
                     }
                 }
             });
